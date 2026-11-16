@@ -207,7 +207,7 @@ fun Home(vm: JarvisVM, onSettings: () -> Unit, onMic: () -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ModeToggle(vm.hybrid) { vm.setHybrid(it) }
+            ModeToggle(vm.hybrid) { vm.switchMode(it) }
         }
         Orb(
             active = vm.listening || vm.speaking || vm.busy,
@@ -469,7 +469,8 @@ fun SettingsScreen(
                     }
                 }
             }
-             Section("Memory Core") {
+
+            Section("Memory Core") {
                 Text(
                     "Short-term conversation buffer + long-term knowledge (Routines, Preferences, Notes, Facts).",
                     color = pal.dim
@@ -535,4 +536,3 @@ fun SettingsScreen(
         )
     }
 }
-            
