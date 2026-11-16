@@ -21,8 +21,13 @@ import java.util.Locale
 
 data class Msg(val user: Boolean, val text: String, val time: String)
 
-private val YES = setOf("അതെ", "ശരി", "ഓക്കെ", "ok", "okay", "yes", "yeah", "send", "confirm", "ഉവ്വ്", "ആം", "ചെയ്യൂ", "അയക്കൂ", "haan", "ha", "han")
-private val CANCEL = listOf("വേണ്ട", "cancel", "stop", "ഒഴിവാക്കൂ", "നിർത്തൂ", "don't", "no")
+private val YES = setOf(
+    "അതെ", "ശരി", "ഓക്കെ", "ok", "okay", "yes", "yeah", "send", "confirm",
+    "ഉവ്വ്", "ആം", "ചെയ്യൂ", "അയക്കൂ", "haan", "ha", "han"
+)
+private val CANCEL = setOf(
+    "വേണ്ട", "cancel", "stop", "ഒഴിവാക്കൂ", "നിർത്തൂ", "don't", "no", "nahi"
+)
 private val CONFIRM = setOf("whatsapp_send", "sms", "termux_install")
 
 class JarvisVM(private val app: Application) : AndroidViewModel(app) {
@@ -34,8 +39,9 @@ class JarvisVM(private val app: Application) : AndroidViewModel(app) {
     private var pending: List<JSONObject>? = null
 
     val messages = mutableStateListOf<Msg>()
-    var hybrid by mutableStateOf(store.hybrid); private set
-    var status by mutableStateOf(idle())
+    var hybrid by mutableStateOf(store.hybrid)
+        private set
+    var status by mutableStateOf(idleText())
     var listening by mutableStateOf(false)
     var speaking by mutableStateOf(false)
     var busy by mutableStateOf(false)
@@ -44,13 +50,22 @@ class JarvisVM(private val app: Application) : AndroidViewModel(app) {
         messages.add(Msg(false, "സിസ്റ്റം തയ്യാറാണ് സർ. എന്ത് ചെയ്യണം, പറഞ്ഞാലും.", now()))
     }
 
-    private fun now() = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
-    private fun idle() = if (store.hybrid) "ഹൈബ്രിഡ് — പൂർണ്ണ സജ്ജം" else "ശാന്തം — നിരീക്ഷിക്കുന്നു"
+    private fun now(): String =
+        SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
 
-    fun setHybrid(h: Boolean) {
+    private fun idleText(): String =
+        if (store.hybrid) "ഹൈബ്രിഡ് — പൂർണ്ണ സജ്ജം" else "ശാന്തം — നിരീക്ഷിക്കുന്നു"
+
+    fun switchMode(h: Boolean) {
         if (h == hybrid) return
-        store.hybrid = h; hybrid = h; pending = null; status = idle()
-        say(if (h) "ഹൈബ്രിഡ് മോഡ് സജീവമായി സർ. കൂടുതൽ നിയന്ത്രണങ്ങൾ ഇപ്പോൾ ലഭ്യമാണ്." else "സാധാരണ മോഡിലേക്ക് മടങ്ങിയിരിക്കുന്നു സർ.")
+        store.hybrid = h
+        hybrid = h
+        pending = null
+        status = idleText()
+        say(
+            if (h) "ഹൈബ്രിഡ് മോഡ് സജീവമായി സർ. കൂടുതൽ നിയന്ത്രണങ്ങൾ ഇപ്പോൾ ലഭ്യമാണ്."
+            else "സാധാരണ മോഡിലേക്ക് മടങ്ങിയിരിക്കുന്നു സർ."
+        )
     }
 
     private fun say(raw: String) {
@@ -58,13 +73,19 @@ class JarvisVM(private val app: Application) : AndroidViewModel(app) {
         messages.add(Msg(false, t, now()))
         speakJob = viewModelScope.launch {
             speaking = true
-            try { speaker.speak(t, store) } finally { speaking = false }
+            try {
+                speaker.speak(t, store)
+            } finally {
+                speaking = false
+            }
         }
     }
 
     fun stopAll() {
-        speakJob?.cancel(); speaker.stop(); speaking = false
-        try { recognizer?.cancel() } catch (e: Exception) {}
+        speakJob?.cancel()
+        speaker.stop()
+        speaking = false
+        try { recognizer?.cancel() } catch (e: Exception) { }
         listening = false
     }
 
@@ -78,18 +99,18 @@ class JarvisVM(private val app: Application) : AndroidViewModel(app) {
         val r = SpeechRecognizer.createSpeechRecognizer(app)
         recognizer = r
         r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(p: Bundle?) { status = "കേൾക്കുന്നു…" }
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(v: Float) {}
-            override fun onBufferReceived(b: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onError(e: Int) { listening = false; status = idle() }
-            override fun onPartialResults(p: Bundle?) {}
-            override fun onEvent(t: Int, p: Bundle?) {}
-            override fun onResults(b: Bundle?) {
+            override fun onReadyForSpeech(params: Bundle?) { status = "കേൾക്കുന്നു…" }
+            override fun onBeginningOfSpeech() { }
+            override fun onRmsChanged(rmsdB: Float) { }
+            override fun onBufferReceived(buffer: ByteArray?) { }
+            override fun onEndOfSpeech() { }
+            override fun onError(error: Int) { listening = false; status = idleText() }
+            override fun onPartialResults(partialResults: Bundle?) { }
+            override fun onEvent(eventType: Int, params: Bundle?) { }
+            override fun onResults(results: Bundle?) {
                 listening = false
-                val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!t.isNullOrBlank()) send(t) else status = idle()
+                val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (!t.isNullOrBlank()) send(t) else status = idleText()
             }
         })
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -114,17 +135,26 @@ class JarvisVM(private val app: Application) : AndroidViewModel(app) {
     fun send(text: String) {
         val t = text.trim()
         if (t.isEmpty() || busy) return
-        speakJob?.cancel(); speaker.stop(); speaking = false
+        speakJob?.cancel()
+        speaker.stop()
+        speaking = false
         messages.add(Msg(true, t, now()))
         viewModelScope.launch {
-            busy = true; status = "ചിന്തിക്കുന്നു…"
+            busy = true
+            status = "ചിന്തിക്കുന്നു…"
             try {
                 val p = pending
                 if (p != null) {
                     pending = null
-                    val low = t.lowercase()
-                    if (CANCEL.any { low.contains(it) }) { say("ശരി സർ, ഒഴിവാക്കിയിരിക്കുന്നു."); return@launch }
-                    if (low.split(Regex("[\\s,.!?]+")).any { it in YES }) { runActions(p, "ശരി സർ."); return@launch }
+                    val toks = t.lowercase().split(Regex("[\\s,.!?]+"))
+                    if (toks.any { it in CANCEL }) {
+                        say("ശരി സർ, ഒഴിവാക്കിയിരിക്കുന്നു.")
+                        return@launch
+                    }
+                    if (toks.any { it in YES }) {
+                        runActions(p, "ശരി സർ.")
+                        return@launch
+                    }
                 }
                 if (store.geminiKey.isBlank()) {
                     say("ക്രമീകരണത്തിൽ Gemini API കീ ചേർത്താൽ ഉടൻ തുടങ്ങാം സർ.")
@@ -132,15 +162,23 @@ class JarvisVM(private val app: Application) : AndroidViewModel(app) {
                 }
                 val r = Gemini.chat(store, messages.toList(), hybrid)
                 val conf = r.actions.filter { it.optString("type") in CONFIRM }
-                if (conf.isNotEmpty()) { pending = r.actions; say(confirmText(conf.first())) }
-                else runActions(r.actions, r.reply)
+                if (conf.isNotEmpty()) {
+                    pending = r.actions
+                    say(confirmText(conf.first()))
+                } else {
+                    runActions(r.actions, r.reply)
+                }
             } catch (e: Exception) {
                 say("കണക്ഷനിൽ ചെറിയ തടസ്സം നേരിട്ടു സർ. API കീ പരിശോധിച്ച് ഒരിക്കൽ കൂടി ശ്രമിക്കാം.")
             } finally {
-                busy = false; status = idle()
+                busy = false
+                status = idleText()
             }
         }
     }
 
-    override fun onCleared() { stopAll(); recognizer?.destroy() }
+    override fun onCleared() {
+        stopAll()
+        recognizer?.destroy()
+    }
 }
