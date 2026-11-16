@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Jarvis</string>
+    <string name="a11y_desc">Jarvis Hybrid Mode: lets the assistant press buttons, scroll and navigate on your voice command.</string>
+</resources>
